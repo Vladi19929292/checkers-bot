@@ -1,0 +1,894 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Checkers vs Bot</title>
+  <meta name="description" content="Play checkers vs a bot. Choose difficulty. Mandatory captures. Fast matches." />
+  <style>
+    :root{
+      --bg1:#0a0f1f;
+      --bg2:#050815;
+
+      --panel: rgba(18, 24, 44, .60);
+      --panelBorder: rgba(255,255,255,.10);
+
+      --txt:#eef2ff;
+      --muted:#a7b1cc;
+
+      --red1:#ff6a6a; --red2:#c91b1b;
+      --blu1:#79e3ff; --blu2:#1787a3;
+
+      --gold:#ffd04d;
+      --shadow: 0 18px 55px rgba(0,0,0,.50);
+
+      --wood1:#6b3f1f;
+      --wood2:#4a2a13;
+      --woodHi: rgba(255,255,255,.10);
+
+      --sqDark1:#6a4221;
+      --sqDark2:#3f240f;
+      --sqLight1:#d7b58a;
+      --sqLight2:#b98c5f;
+    }
+
+    *{box-sizing:border-box;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;}
+    html,body{height:100%;margin:0;color:var(--txt);}
+    body{
+      background:
+        radial-gradient(900px 600px at 50% 10%, #1a2b66 0%, var(--bg1) 52%, var(--bg2) 100%);
+    }
+
+    /* ===== Responsive iframe-friendly layout =====
+       Goal: everything visible without scrolling on typical play.fun embed
+    */
+    .wrap{
+      min-height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:12px;
+    }
+    .app{
+      width:min(980px,100%);
+      display:grid;
+      grid-template-columns:1fr;
+      gap:10px;
+    }
+
+    .top{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      padding:10px 12px;
+      border-radius:18px;
+      background:var(--panel);
+      border:1px solid var(--panelBorder);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+    .title{display:flex;flex-direction:column;gap:2px;min-width:240px}
+    .title b{font-size:16px;letter-spacing:.2px}
+    .title span{font-size:12px;color:var(--muted);line-height:1.25}
+
+    .panelRight{
+      display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:flex-end;
+    }
+    .pill{
+      padding:8px 10px;
+      border-radius:999px;
+      background:rgba(0,0,0,.22);
+      border:1px solid rgba(255,255,255,.12);
+      font-size:12px;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+    .pill b{color:var(--txt)}
+    .btn{
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.10);
+      color:var(--txt);
+      font-weight:900;
+      border-radius:14px;
+      padding:9px 12px;
+      cursor:pointer;
+    }
+    .btn:active{transform:scale(.99)}
+    .btn[disabled]{opacity:.55;cursor:not-allowed}
+
+    .select{
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(0,0,0,.20);
+      color:var(--txt);
+      font-weight:800;
+      border-radius:14px;
+      padding:9px 10px;
+      cursor:pointer;
+      outline:none;
+    }
+
+    .main{
+      display:grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap:10px;
+      align-items:stretch;
+    }
+    @media (max-width: 860px){
+      .main{grid-template-columns:1fr; }
+    }
+
+    .card{
+      border-radius:18px;
+      background:var(--panel);
+      border:1px solid var(--panelBorder);
+      box-shadow: var(--shadow);
+      padding:10px 12px;
+      backdrop-filter: blur(8px);
+    }
+
+    .info{
+      display:grid;
+      gap:8px;
+    }
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .badge{
+      padding:7px 10px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      font-size:12px;font-weight:900;
+    }
+    .turnRed{background:rgba(255,77,77,.12);color:#ffd0d0}
+    .turnBlu{background:rgba(77,210,255,.12);color:#c9f2ff}
+    .note{font-size:12px;color:var(--muted);line-height:1.35}
+    .win{font-size:14px;font-weight:1000}
+    .small{font-size:12px;color:var(--muted)}
+
+    /* ===== Wood board ===== */
+    .boardOuter{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      padding:10px;
+      border-radius:18px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.05), rgba(0,0,0,.08)),
+        linear-gradient(180deg, var(--wood1), var(--wood2));
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow: 0 20px 60px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.25);
+    }
+
+    /* Board scales inside iframe:
+       - max height limited so top UI remains visible
+       - aspect ratio maintained
+    */
+    .board{
+      width:min(560px, 100%);
+      max-height: min(62vh, 620px);
+      aspect-ratio:1/1;
+      display:grid;
+      grid-template-columns:repeat(8,1fr);
+      border-radius:14px;
+      overflow:hidden;
+      border:1px solid rgba(0,0,0,.35);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.10);
+      touch-action:manipulation;
+      background:rgba(0,0,0,.10);
+    }
+
+    .sq{
+      display:flex;align-items:center;justify-content:center;position:relative;
+    }
+    .dark{
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.05)),
+        linear-gradient(180deg, var(--sqDark1), var(--sqDark2));
+    }
+    .light{
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.08), rgba(0,0,0,.02)),
+        linear-gradient(180deg, var(--sqLight1), var(--sqLight2));
+    }
+    .sq.sel{
+      outline:3px solid rgba(255,208,77,.70);
+      outline-offset:-3px;
+    }
+    .hintDot{
+      width:14px;height:14px;border-radius:999px;
+      background:rgba(255,208,77,.95);
+      box-shadow:0 0 18px rgba(255,208,77,.35);
+      position:absolute;
+    }
+
+    .piece{
+      width:72%;height:72%;
+      border-radius:999px;
+      display:grid;place-items:center;
+      box-shadow: 0 10px 22px rgba(0,0,0,.40), inset 0 0 0 2px rgba(255,255,255,.20);
+      position:relative;
+      user-select:none;
+    }
+    .p1{
+      background:
+        radial-gradient(circle at 30% 30%, rgba(255,255,255,.28), rgba(0,0,0,0) 42%),
+        linear-gradient(180deg, var(--red1), var(--red2));
+    }
+    .p2{
+      background:
+        radial-gradient(circle at 30% 30%, rgba(255,255,255,.28), rgba(0,0,0,0) 42%),
+        linear-gradient(180deg, var(--blu1), var(--blu2));
+    }
+    .king::after{
+      content:"♛";
+      font-size:22px;
+      color:rgba(255,255,255,.94);
+      text-shadow:0 2px 12px rgba(0,0,0,.45);
+    }
+
+    .toast{
+      position:fixed;left:50%;bottom:14px;transform:translateX(-50%);
+      background:rgba(0,0,0,.72);
+      border:1px solid rgba(255,255,255,.12);
+      color:var(--txt);padding:10px 12px;border-radius:14px;font-size:13px;
+      opacity:0;pointer-events:none;transition:opacity .2s;
+    }
+    .toast.show{opacity:1;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="app">
+      <div class="top">
+        <div class="title">
+          <b>Checkers vs Bot</b>
+          <span>You are <b>Red</b>. Captures are mandatory. Choose difficulty and try to win fast.</span>
+        </div>
+        <div class="panelRight">
+          <div class="pill">Red: <b id="c1">12</b> • Bot: <b id="c2">12</b></div>
+          <div class="pill">Moves: <b id="moves">0</b></div>
+          <select class="select" id="difficulty">
+            <option value="easy">Bot: Easy</option>
+            <option value="medium" selected>Bot: Medium</option>
+            <option value="hard">Bot: Hard</option>
+          </select>
+          <button class="btn" id="resetBtn">Restart</button>
+        </div>
+      </div>
+
+      <div class="main">
+        <div class="card">
+          <div class="info">
+            <div class="row">
+              <div class="badge turnRed" id="turnBadge">Turn: Red</div>
+              <div class="pill" id="mustEat">Must capture: <b>NO</b></div>
+              <div class="pill">Bot: <b id="botState">ready</b></div>
+              <button class="btn" id="shareBtn" title="Copy share text">Share</button>
+            </div>
+            <div class="note">
+              Simple rules: diagonal moves, mandatory capture if available, multi-capture chains, king promotion.
+              (Kings move/capture one step in any direction — not flying kings.)
+            </div>
+            <div class="win" id="win"></div>
+            <div class="small" id="hint"></div>
+          </div>
+        </div>
+
+        <div class="boardOuter">
+          <div class="board" id="board" aria-label="Checkers board"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Copied!</div>
+
+<script>
+/* ===== Checkers vs Bot (single player) =====
+   Human = Red (P1), Bot = Blue (P2)
+
+   Difficulty:
+   - easy: random among legal moves (still respects mandatory capture)
+   - medium: heuristic scoring (captures, chain length, promotion, avoid immediate recapture)
+   - hard: shallow minimax (depth 2-3 depending on position) + chain-aware
+*/
+
+const SIZE = 8;
+const P1 = 1, P2 = 2;
+
+const boardEl = document.getElementById('board');
+const c1El = document.getElementById('c1');
+const c2El = document.getElementById('c2');
+const movesEl = document.getElementById('moves');
+const resetBtn = document.getElementById('resetBtn');
+const turnBadge = document.getElementById('turnBadge');
+const mustEatEl = document.getElementById('mustEat');
+const winEl = document.getElementById('win');
+const botStateEl = document.getElementById('botState');
+const hintEl = document.getElementById('hint');
+const difficultyEl = document.getElementById('difficulty');
+const shareBtn = document.getElementById('shareBtn');
+const toast = document.getElementById('toast');
+
+let state;
+
+function showToast(msg){
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'), 900);
+}
+function inBounds(r,c){ return r>=0 && r<SIZE && c>=0 && c<SIZE; }
+function enemyOf(p){ return p===P1 ? P2 : P1; }
+function clamp(n,a,b){ return Math.max(a, Math.min(b,n)); }
+
+function init(){
+  state = {
+    grid: makeInitialGrid(),
+    turn: P1,
+    selected: null,
+    legalMoves: [],
+    moveCount: 0,
+    forcedChainFrom: null,
+    winner: null,
+    botThinking: false
+  };
+  render();
+  maybeBotTurn();
+}
+
+function makeInitialGrid(){
+  const g = Array.from({length: SIZE}, () => Array.from({length: SIZE}, () => null));
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      if((r+c)%2===1){
+        if(r<=2) g[r][c] = {p:P1, k:false};
+        if(r>=5) g[r][c] = {p:P2, k:false};
+      }
+    }
+  }
+  return g;
+}
+
+function dirsFor(cell){
+  if(cell.k) return [1,-1];
+  return cell.p===P1 ? [1] : [-1];
+}
+
+function cloneGrid(grid){
+  return grid.map(row => row.map(cell => cell ? {p:cell.p, k:cell.k} : null));
+}
+
+function getCapturesFrom(grid, r,c,cell){
+  const caps = [];
+  const drs = dirsFor(cell);
+  const foe = enemyOf(cell.p);
+  for(const dr of drs){
+    for(const dc of [-1,1]){
+      const r1 = r + dr, c1 = c + dc;
+      const r2 = r + dr*2, c2 = c + dc*2;
+      if(!inBounds(r2,c2)) continue;
+      const mid = grid[r1]?.[c1];
+      const land = grid[r2][c2];
+      if(mid && mid.p===foe && !land){
+        caps.push({type:'cap', from:{r,c}, to:{r:r2,c:c2}, cap:{r:r1,c:c1}});
+      }
+    }
+  }
+  return caps;
+}
+
+function getMovesFrom(grid, r,c,cell){
+  const moves = [];
+  const drs = dirsFor(cell);
+  for(const dr of drs){
+    for(const dc of [-1,1]){
+      const r1 = r + dr, c1 = c + dc;
+      if(!inBounds(r1,c1)) continue;
+      if(!grid[r1][c1]){
+        moves.push({type:'move', from:{r,c}, to:{r:r1,c:c1}});
+      }
+    }
+  }
+  return moves;
+}
+
+function playerHasAnyCapture(grid, player){
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      const cell = grid[r][c];
+      if(!cell || cell.p!==player) continue;
+      if(getCapturesFrom(grid,r,c,cell).length) return true;
+    }
+  }
+  return false;
+}
+
+function getLegalMovesForPiece(r,c){
+  const cell = state.grid[r][c];
+  if(!cell || cell.p!==state.turn) return [];
+
+  if(state.forcedChainFrom){
+    if(state.forcedChainFrom.r!==r || state.forcedChainFrom.c!==c) return [];
+    return getCapturesFrom(state.grid,r,c,cell);
+  }
+
+  const mustEat = playerHasAnyCapture(state.grid, state.turn);
+  const caps = getCapturesFrom(state.grid,r,c,cell);
+  if(mustEat) return caps;
+  return [...caps, ...getMovesFrom(state.grid,r,c,cell)];
+}
+
+function render(){
+  boardEl.innerHTML = '';
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      const sq = document.createElement('div');
+      sq.className = 'sq ' + (((r+c)%2===1) ? 'dark' : 'light');
+      sq.dataset.r = r;
+      sq.dataset.c = c;
+
+      const isSel = state.selected && state.selected.r===r && state.selected.c===c;
+      if(isSel) sq.classList.add('sel');
+
+      if(state.legalMoves.some(m => m.to.r===r && m.to.c===c)){
+        const dot = document.createElement('div');
+        dot.className = 'hintDot';
+        sq.appendChild(dot);
+      }
+
+      const cell = state.grid[r][c];
+      if(cell){
+        const p = document.createElement('div');
+        p.className = 'piece ' + (cell.p===P1 ? 'p1' : 'p2') + (cell.k ? ' king' : '');
+        if(cell.p===P2) p.style.cursor = 'default';
+        sq.appendChild(p);
+      }
+
+      sq.addEventListener('click', onSquareClick);
+      boardEl.appendChild(sq);
+    }
+  }
+
+  // counts
+  let n1=0,n2=0;
+  for(const row of state.grid){
+    for(const cell of row){
+      if(!cell) continue;
+      if(cell.p===P1) n1++; else n2++;
+    }
+  }
+  c1El.textContent = n1;
+  c2El.textContent = n2;
+  movesEl.textContent = state.moveCount;
+
+  // turn badge
+  if(state.turn===P1){
+    turnBadge.textContent = 'Turn: Red';
+    turnBadge.className = 'badge turnRed';
+  } else {
+    turnBadge.textContent = 'Turn: Bot';
+    turnBadge.className = 'badge turnBlu';
+  }
+
+  // must capture?
+  const mustEat = playerHasAnyCapture(state.grid, state.turn);
+  mustEatEl.innerHTML = 'Must capture: <b>' + (mustEat ? 'YES' : 'NO') + '</b>';
+
+  botStateEl.textContent = state.botThinking ? 'thinking…' : 'ready';
+
+  if(state.winner){
+    winEl.textContent = (state.winner===P1 ? '🏆 YOU WIN!' : '🤖 BOT WINS!');
+    hintEl.textContent = 'Press Restart to play again.';
+  } else {
+    winEl.textContent = '';
+    if(state.turn===P1){
+      if(state.forcedChainFrom){
+        hintEl.textContent = 'Multi-capture: you must continue capturing with the same piece.';
+      } else if(mustEat){
+        hintEl.textContent = 'Capture is available: you must capture.';
+      } else {
+        hintEl.textContent = 'Select a red piece, then click a highlighted destination.';
+      }
+    } else {
+      hintEl.textContent = 'Bot is playing…';
+    }
+  }
+
+  if(state.turn===P2){
+    state.selected = null;
+    state.legalMoves = [];
+  }
+}
+
+function onSquareClick(e){
+  if(state.winner) return;
+  if(state.turn !== P1) return;
+  if(state.botThinking) return;
+
+  const r = Number(e.currentTarget.dataset.r);
+  const c = Number(e.currentTarget.dataset.c);
+  const cell = state.grid[r][c];
+
+  // destination?
+  const mv = state.legalMoves.find(m => m.to.r===r && m.to.c===c);
+  if(mv){
+    applyMove(mv);
+    return;
+  }
+
+  // select own piece
+  if(cell && cell.p===P1){
+    if(state.forcedChainFrom && (state.forcedChainFrom.r!==r || state.forcedChainFrom.c!==c)) return;
+    state.selected = {r,c};
+    state.legalMoves = getLegalMovesForPiece(r,c);
+    render();
+    return;
+  }
+
+  if(!state.forcedChainFrom){
+    state.selected = null;
+    state.legalMoves = [];
+    render();
+  }
+}
+
+function promoteIfNeeded(piece, to){
+  if(piece && !piece.k){
+    if(piece.p===P1 && to.r===SIZE-1) piece.k = true;
+    if(piece.p===P2 && to.r===0) piece.k = true;
+  }
+}
+
+function applyMove(m){
+  const {from,to} = m;
+  const piece = state.grid[from.r][from.c];
+  state.grid[from.r][from.c] = null;
+  state.grid[to.r][to.c] = piece;
+
+  let didCapture = false;
+  if(m.type==='cap'){
+    didCapture = true;
+    state.grid[m.cap.r][m.cap.c] = null;
+  }
+
+  promoteIfNeeded(piece, to);
+
+  state.moveCount++;
+
+  // chain?
+  if(didCapture){
+    const moreCaps = getCapturesFrom(state.grid, to.r,to.c,piece);
+    if(moreCaps.length){
+      state.forcedChainFrom = {r:to.r,c:to.c};
+      if(state.turn===P1){
+        state.selected = {r:to.r,c:to.c};
+        state.legalMoves = moreCaps;
+      }
+      checkWinnerAfterMove();
+      render();
+      maybeBotTurn();
+      return;
+    }
+  }
+
+  // end turn
+  state.forcedChainFrom = null;
+  state.selected = null;
+  state.legalMoves = [];
+  state.turn = (state.turn===P1 ? P2 : P1);
+
+  checkWinnerAfterMove();
+  render();
+  maybeBotTurn();
+}
+
+function anyLegalMoveFor(grid, player){
+  const mustEat = playerHasAnyCapture(grid, player);
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      const cell = grid[r][c];
+      if(!cell || cell.p!==player) continue;
+      const caps = getCapturesFrom(grid,r,c,cell);
+      if(mustEat){
+        if(caps.length) return true;
+      } else {
+        const moves = getMovesFrom(grid,r,c,cell);
+        if(caps.length || moves.length) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function countPieces(grid){
+  let n1=0,n2=0;
+  for(const row of grid){
+    for(const cell of row){
+      if(!cell) continue;
+      if(cell.p===P1) n1++; else n2++;
+    }
+  }
+  return {n1,n2};
+}
+
+function checkWinnerAfterMove(){
+  const {n1,n2} = countPieces(state.grid);
+  if(n1===0){ state.winner = P2; return; }
+  if(n2===0){ state.winner = P1; return; }
+
+  const canMoveP1 = anyLegalMoveFor(state.grid, P1);
+  const canMoveP2 = anyLegalMoveFor(state.grid, P2);
+  if(!canMoveP1) state.winner = P2;
+  if(!canMoveP2) state.winner = P1;
+}
+
+/* ========= BOT ========= */
+
+function simulateApply(grid, move){
+  const g = cloneGrid(grid);
+  const piece = g[move.from.r][move.from.c];
+  g[move.from.r][move.from.c] = null;
+  g[move.to.r][move.to.c] = piece;
+  if(move.type==='cap'){
+    g[move.cap.r][move.cap.c] = null;
+  }
+  if(piece && !piece.k){
+    if(piece.p===P1 && move.to.r===SIZE-1) piece.k = true;
+    if(piece.p===P2 && move.to.r===0) piece.k = true;
+  }
+  return g;
+}
+
+function maxCaptureChainLen(grid, r,c){
+  const cell = grid[r][c];
+  if(!cell) return 0;
+  const caps = getCapturesFrom(grid,r,c,cell);
+  if(!caps.length) return 0;
+  let best = 0;
+  for(const mv of caps){
+    const g2 = simulateApply(grid, mv);
+    const len = 1 + maxCaptureChainLen(g2, mv.to.r, mv.to.c);
+    if(len > best) best = len;
+  }
+  return best;
+}
+
+function getAllLegalMovesFor(grid, player, forcedChainFrom=null){
+  const mustEat = playerHasAnyCapture(grid, player);
+  const out = [];
+  if(forcedChainFrom){
+    const {r,c} = forcedChainFrom;
+    const cell = grid[r][c];
+    if(cell && cell.p===player){
+      return getCapturesFrom(grid,r,c,cell);
+    }
+    return [];
+  }
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      const cell = grid[r][c];
+      if(!cell || cell.p!==player) continue;
+      const caps = getCapturesFrom(grid,r,c,cell);
+      if(mustEat){
+        if(caps.length) out.push(...caps);
+      } else {
+        out.push(...caps, ...getMovesFrom(grid,r,c,cell));
+      }
+    }
+  }
+  return out;
+}
+
+function isSquareAttackedBy(grid, attacker, r, c){
+  // quick check: does attacker have a capture landing on (r,c)? or move to (r,c)?
+  // We care mainly about immediate recapture: use capture logic.
+  for(let rr=0; rr<SIZE; rr++){
+    for(let cc=0; cc<SIZE; cc++){
+      const cell = grid[rr][cc];
+      if(!cell || cell.p!==attacker) continue;
+      const caps = getCapturesFrom(grid, rr, cc, cell);
+      for(const mv of caps){
+        if(mv.to.r===r && mv.to.c===c) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function heuristicScore(grid, move, player){
+  // Higher is better for 'player'
+  let score = 0;
+  const foe = enemyOf(player);
+
+  // captures
+  if(move.type==='cap') score += 120;
+
+  // chain potential
+  const g2 = simulateApply(grid, move);
+  if(move.type==='cap'){
+    const chain = maxCaptureChainLen(g2, move.to.r, move.to.c);
+    score += chain * 55;
+  }
+
+  // promotion
+  const before = grid[move.from.r][move.from.c];
+  if(before && !before.k){
+    if(player===P2 && move.to.r===0) score += 90;
+    if(player===P1 && move.to.r===SIZE-1) score += 90;
+  }
+
+  // avoid immediate recapture (simple safety)
+  const attacked = isSquareAttackedBy(g2, foe, move.to.r, move.to.c);
+  if(attacked) score -= 55;
+
+  // slight forward preference (for men)
+  if(before && !before.k){
+    score += (player===P2 ? (move.from.r - move.to.r) : (move.to.r - move.from.r)) * 4;
+  }
+
+  // random small to avoid deterministic loops
+  score += Math.random() * 6;
+  return score;
+}
+
+function evaluateBoard(grid){
+  // bot-centric evaluation (P2 positive)
+  // men=10, king=16
+  let s = 0;
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      const cell = grid[r][c];
+      if(!cell) continue;
+      const v = cell.k ? 16 : 10;
+      s += (cell.p===P2 ? v : -v);
+    }
+  }
+  return s;
+}
+
+function minimax(grid, playerTurn, depth, forcedChainFrom=null, alpha=-Infinity, beta=Infinity){
+  // returns evaluation from bot (P2) perspective
+  if(depth<=0){
+    return evaluateBoard(grid);
+  }
+
+  // terminal: no moves
+  const moves = getAllLegalMovesFor(grid, playerTurn, forcedChainFrom);
+  if(!moves.length){
+    return (playerTurn===P2) ? -9999 : 9999;
+  }
+
+  const maximizing = (playerTurn===P2);
+  let best = maximizing ? -Infinity : Infinity;
+
+  for(const mv of moves){
+    const g2 = simulateApply(grid, mv);
+
+    // chain continuation if capture and more captures exist from landing square
+    let nextForced = null;
+    if(mv.type==='cap'){
+      const piece = g2[mv.to.r][mv.to.c];
+      const more = getCapturesFrom(g2, mv.to.r, mv.to.c, piece);
+      if(more.length){
+        nextForced = {r: mv.to.r, c: mv.to.c};
+      }
+    }
+
+    const nextPlayer = nextForced ? playerTurn : enemyOf(playerTurn);
+    const val = minimax(g2, nextPlayer, depth-1, nextForced, alpha, beta);
+
+    if(maximizing){
+      best = Math.max(best, val);
+      alpha = Math.max(alpha, best);
+      if(beta <= alpha) break;
+    } else {
+      best = Math.min(best, val);
+      beta = Math.min(beta, best);
+      if(beta <= alpha) break;
+    }
+  }
+  return best;
+}
+
+function chooseBotMove(){
+  const diff = difficultyEl.value;
+
+  // if bot is in forced chain, only captures from that piece
+  const forced = state.forcedChainFrom;
+  const moves = getAllLegalMovesFor(state.grid, P2, forced);
+
+  if(!moves.length) return null;
+
+  if(diff === 'easy'){
+    return moves[Math.floor(Math.random()*moves.length)];
+  }
+
+  if(diff === 'medium'){
+    let best = moves[0], bestScore = -Infinity;
+    for(const mv of moves){
+      const s = heuristicScore(state.grid, mv, P2);
+      if(s > bestScore){ bestScore = s; best = mv; }
+    }
+    return best;
+  }
+
+  // hard: minimax depth adaptive
+  // keep it light so it runs smooth in browser/iframe
+  const pieceCount = (() => {
+    let n=0;
+    for(const row of state.grid) for(const cell of row) if(cell) n++;
+    return n;
+  })();
+  const depth = pieceCount > 16 ? 2 : 3; // deeper in late game
+
+  let best = moves[0];
+  let bestVal = -Infinity;
+
+  for(const mv of moves){
+    const g2 = simulateApply(state.grid, mv);
+
+    let nextForced = null;
+    if(mv.type==='cap'){
+      const piece = g2[mv.to.r][mv.to.c];
+      const more = getCapturesFrom(g2, mv.to.r, mv.to.c, piece);
+      if(more.length) nextForced = {r: mv.to.r, c: mv.to.c};
+    }
+    const nextPlayer = nextForced ? P2 : P1;
+
+    const val = minimax(g2, nextPlayer, depth, nextForced);
+    // add small heuristic tie-break
+    const tie = heuristicScore(state.grid, mv, P2) * 0.03;
+    const total = val + tie;
+
+    if(total > bestVal){
+      bestVal = total;
+      best = mv;
+    }
+  }
+  return best;
+}
+
+function maybeBotTurn(){
+  if(state.winner) return;
+  if(state.turn !== P2) return;
+
+  state.botThinking = true;
+  render();
+
+  setTimeout(() => {
+    const chosen = chooseBotMove();
+    if(!chosen){
+      state.winner = P1;
+      state.botThinking = false;
+      render();
+      return;
+    }
+    state.botThinking = false;
+    applyMove(chosen);
+  }, 380);
+}
+
+/* ========= UI ========= */
+
+resetBtn.addEventListener('click', init);
+
+shareBtn.addEventListener('click', async () => {
+  const diff = difficultyEl.value;
+  const name = diff === 'easy' ? 'Easy' : diff === 'medium' ? 'Medium' : 'Hard';
+  const msg = `Checkers vs Bot (${name}) — can you beat it? 🧠🔥`;
+  try{
+    await navigator.clipboard.writeText(msg);
+    showToast('Copied share text ✅');
+  }catch{
+    showToast('Copy failed');
+  }
+});
+
+// if user changes difficulty mid-game, keep it (no restart needed)
+difficultyEl.addEventListener('change', () => {
+  showToast('Difficulty set ✅');
+});
+
+init();
+</script>
+</body>
+</html>
